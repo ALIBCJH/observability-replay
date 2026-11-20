@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benchmark report</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<div id="app" class="report">
+  <div id="nav" class="bar" hidden>
+    <span class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="var(--accent)"/><path d="M4 13h4l2.5-6 3.5 10 2.5-6H20" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Observability replay
+    </span>
+    <nav class="tabs" aria-label="Views">
+      <a href="apps-preview.html">Applications</a>
+      <a href="preview.html">Incident replay</a>
+      <a href="benchmark-preview.html" aria-current="page">Benchmark</a>
+    </nav>
+  </div>
+  <header class="top">
+    <div>
+      <p class="eyebrow">Benchmark report</p>
+      <h1 id="title">Benchmark</h1>
+    </div>
+    <p id="meta" class="muted"></p>
+  </header>
+
+  <p id="empty" class="surface notice muted" hidden></p>
+  <main id="report" hidden></main>
+</div>
+<div id="tip" role="tooltip" hidden></div>
+<script>window.__BENCHMARK__ = /*DATA*/null;</script>
+<script>/*JS*/</script>
+</body>
+</html>
