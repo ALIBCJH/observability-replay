@@ -213,7 +213,7 @@ export function createServer(adapter: Adapter, slo: Slo = sloFromEnv()): McpServ
     {
       title: "Application scorecards",
       description:
-        "How each application is doing, worst first: request volume, p95 latency, error ratio against the error budget, CPU and memory used against what it requested, restarts, and whether its last deploy made it better or worse. Shows a fleet list with a detail page per application, and returns the findings as text. Pass `app` to open one application.",
+        "How each application is doing, worst first: request volume, p95 latency, error ratio against the error budget, CPU and memory used against what it requested, restarts, and whether its last deploy made it better or worse. Shows a card per application (performance, metrics and whether it is optimal) with a detail section for the selected one, and returns the findings as text. Pass `app` to open one application.",
       inputSchema: {
         minutes: z
           .number()
