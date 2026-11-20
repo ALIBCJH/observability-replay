@@ -13,7 +13,18 @@ An MCP server that gives an agent two views over any observability backend:
 It is built to be backend-agnostic. The agent and the view only see a neutral
 model; one adapter per observability tool translates into it.
 
-## Try it without any backend
+## Try it in one command
+
+Needs Node 20 or newer.
+
+```bash
+npx observability-replay live
+```
+
+Then open http://127.0.0.1:8766/. With no backend configured it plays a
+scripted incident, so you can see all three pages before connecting anything.
+
+## Try it from a checkout
 
 Needs Node 20 or newer (`nvm use` picks 22).
 
@@ -42,15 +53,16 @@ tenth of the CPU it requests.
 {
   "mcpServers": {
     "observability": {
-      "command": "node",
-      "args": ["/absolute/path/to/observability/dist/server.js"],
+      "command": "npx",
+      "args": ["-y", "observability-replay"],
       "env": { "OBS_BACKEND": "demo" }
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/observability` with your checkout location.
+From a checkout, use `"command": "node"` with
+`"args": ["/absolute/path/to/observability-replay/dist/server.js"]` instead.
 
 The animated view appears in clients that support MCP Apps. In other clients the
 tools still work and return text.
@@ -142,7 +154,7 @@ Docker container addresses.
 
 ## Watch a backend live
 
-`npm run live` serves the three pages on the connected backend's own data,
+`npx observability-replay live` (or `npm run live` in a checkout) serves the three pages on the connected backend's own data,
 on this machine only (`127.0.0.1`), so you can leave the applications page
 open while something happens: a deploy, a load test, a pod being killed.
 

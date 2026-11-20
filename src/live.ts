@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { adapterFromEnv } from "./adapters/index.js";
 import type { Adapter } from "./adapters/types.js";
 import { runBenchmark } from "./benchmark.js";
+import { isMain } from "./main.js";
 import { buildReplay, resolveRange } from "./replay.js";
 import { buildScorecards, SCORECARD_MAX_FRAMES, sloFromEnv } from "./scorecard.js";
 
@@ -80,13 +81,13 @@ export function liveServer(adapter: Adapter, opts: LiveOptions): Server {
   });
 }
 
-function main() {
+export function main() {
   const arg = (name: string, fallback: number) => {
     const i = process.argv.indexOf(`--${name}`);
     const v = i > 0 ? Number(process.argv[i + 1]) : NaN;
     return Number.isFinite(v) ? v : fallback;
   };
-  const opts: LiveOptions = { port: arg("port", 8766), minutes: arg("minutes", 15), refreshSeconds: arg("refresh", 10) };
+  const opts: LiveOptions = { port: arg("port", 8766), minutes: arg("minutes", 30), refreshSeconds: arg("refresh", 10) };
   const adapter = adapterFromEnv();
   // Loopback only: the pages show backend data and have no sign-in.
   liveServer(adapter, opts).listen(opts.port, "127.0.0.1", () => {
@@ -94,5 +95,4 @@ function main() {
   });
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()!);
-if (isMain) main();
+if (isMain(import.meta.url, "live")) main();

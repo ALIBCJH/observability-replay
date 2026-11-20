@@ -21,6 +21,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { adapterFromEnv } from "./adapters/index.js";
+import { isMain } from "./main.js";
 import {
   TEST_PHASES,
   compareBenchmarks,
@@ -167,7 +168,7 @@ export async function runTest(plan: Plan, log: (line: string) => void = () => {}
 /** How long to wait after a test for the backend to have scraped it. */
 const SETTLE_SECONDS = 45;
 
-async function main() {
+export async function main() {
   const [mode, ...rest] = process.argv.slice(2);
   const arg = (name: string) => {
     const i = rest.indexOf(`--${name}`);
@@ -224,8 +225,7 @@ async function main() {
   console.error(`\nsaved: ${out}\nreport: ${page}`);
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()!);
-if (isMain) {
+if (isMain(import.meta.url, "bench")) {
   main().catch((e) => {
     console.error(e.message);
     process.exit(1);
