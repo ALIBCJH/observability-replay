@@ -140,6 +140,24 @@ expose it to the public internet. The optional `deploy/monitoring/prom-url.sh
 <k3d-node-container>` helper prints the NodePort URL on hosts that can reach
 Docker container addresses.
 
+## Watch a backend live
+
+`npm run live` serves the three pages on the connected backend's own data,
+on this machine only (`127.0.0.1`), so you can leave the applications page
+open while something happens: a deploy, a load test, a pod being killed.
+
+```bash
+npm run build
+export OBS_BACKEND=prometheus OBS_PROM_URL=http://127.0.0.1:9090
+npm run live -- --minutes 15 --refresh 10     # then open http://127.0.0.1:8766/
+```
+
+Each page load reads the backend again, and the applications page re-reads
+every `--refresh` seconds (0 turns that off) and keeps the open application
+selected. `--minutes` is the window each page covers and `--port` changes the
+port. The pages are read-only and have no sign-in, which is why they are bound
+to the loopback address; do not put them behind a public proxy.
+
 ## What the scorecard measures
 
 Objectives are set once for the whole fleet: `OBS_SLO_AVAILABILITY` (percent,
