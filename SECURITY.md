@@ -26,6 +26,8 @@ commitment for older versions; fixes target the current development version.
 - JSON results and HTML reports embed backend data. They can reveal internal
   topology and operational details. Review them before sharing. Ignored files
   are still present on disk and are not protected against direct folder uploads.
+- `npm run live` serves pages of backend data without sign-in. It binds to the
+  loopback address only; do not expose it through a proxy or tunnel.
 - The monitoring manifest is a local development example. It includes
   unauthenticated network endpoints, a NodePort, cluster-wide read permissions,
   and a root Prometheus container with local storage. It is not a production

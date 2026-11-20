@@ -180,7 +180,16 @@ function renderRows() {
             h("span", { class: "pane-title" }, "Metrics"),
             stat("Requests", fmt.rate(a.usage.now), ""),
             ...(r
-              ? [share("CPU", r.cpuOfRequest, "of request", 0.9), share("Memory, peak", r.memPeakOfLimit, "of limit", 0.9)]
+              ? [
+                  stat(
+                    "Pods running",
+                    r.replicas === null ? "0" : String(r.replicas),
+                    r.restarts ? `${r.restarts} ${r.restarts === 1 ? "restart" : "restarts"} in window` : "no restarts",
+                    r.replicas === null || r.replicas === 0 ? "bad" : r.restarts ? "elevated" : "",
+                  ),
+                  share("CPU", r.cpuOfRequest, "of request", 0.9),
+                  share("Memory, peak", r.memPeakOfLimit, "of limit", 0.9),
+                ]
               : [stat("CPU and memory", "Not available", "")]),
           ),
         ),
@@ -441,6 +450,7 @@ function renderDetail() {
 
 function select(id: string | null, scroll = false) {
   selected = id;
+  $("detail").classList.remove("still");
   for (const row of document.querySelectorAll<HTMLElement>("#rows .row")) {
     row.setAttribute("aria-pressed", String(row.dataset.app === id));
   }
@@ -448,8 +458,10 @@ function select(id: string | null, scroll = false) {
   if (scroll && id) $("detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function prepare(b: ScorecardBundle) {
+function prepare(b: ScorecardBundle, keepSelection = false) {
   B = b;
+  // A timed re-read should not replay the detail section's entrance.
+  $("detail").classList.toggle("still", keepSelection);
   playEntrance();
   const minutes = Math.round((b.range.end - b.range.start) / 60);
   const day = new Date(b.range.end * 1000).toISOString().slice(0, 10);
@@ -467,7 +479,7 @@ function prepare(b: ScorecardBundle) {
     return;
   }
 
-  selected = b.focus ?? null;
+  selected = keepSelection && b.apps.some((x) => x.id === selected) ? selected : (b.focus ?? null);
   renderSummary();
   renderRows();
   renderDetail();
@@ -499,6 +511,18 @@ if (isBundle(embedded)) {
   const want = /[#&]app=([^&]+)/.exec(location.hash);
   if (want && embedded.apps.some((a) => a.id === decodeURIComponent(want[1]!))) {
     select(decodeURIComponent(want[1]!));
+  }
+  // Served live: read the backend again on a timer, keeping the selection.
+  const live = (window as unknown as { __LIVE__?: { url: string; seconds: number } }).__LIVE__;
+  if (live) {
+    setInterval(async () => {
+      try {
+        const next: unknown = await (await fetch(live.url, { cache: "no-store" })).json();
+        if (isBundle(next)) prepare(next, true);
+      } catch {
+        // Keep showing the last good read; the next tick tries again.
+      }
+    }, live.seconds * 1000);
   }
 } else {
   const app = new App({ name: "Application scorecards", version: "0.1.0" }, {});

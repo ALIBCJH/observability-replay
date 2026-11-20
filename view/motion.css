@@ -85,7 +85,7 @@ details[open] #querylist > * { animation: termLine 0.25s ease-out both; animatio
 .enter #rows .share b { animation: spanGrow 0.7s ease-out both; animation-delay: calc(0.6s + var(--i, 0) * 0.1s); }
 .enter #rows .answer .mark { animation: pop2 0.3s ease-out both; animation-delay: calc(0.9s + var(--i, 0) * 0.1s); }
 /* Choosing an application: its sections rise in, as fragments do on Next. */
-#detail > * { animation: rise 0.4s ease both; }
+#detail:not(.still) > * { animation: rise 0.4s ease both; }
 
 /* ---- incident replay ---- */
 .enter #stage { animation: rise 0.6s ease-out both; }

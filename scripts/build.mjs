@@ -16,7 +16,7 @@ const thirdPartyNotices = await readFile(p("THIRD_PARTY_NOTICES.txt"), "utf-8");
 
 // Server and library: our code only, dependencies stay in node_modules.
 await build({
-  entryPoints: [p("src/server.ts"), p("src/lib.ts"), p("src/bench.ts")],
+  entryPoints: [p("src/server.ts"), p("src/lib.ts"), p("src/bench.ts"), p("src/live.ts")],
   outdir: p("dist"),
   bundle: true,
   packages: "external",
