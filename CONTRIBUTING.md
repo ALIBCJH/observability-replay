@@ -47,7 +47,12 @@ are not part of the automated test suite. See [plan setup](benchmark/plans/READM
 
 Report ordinary bugs with reproduction steps, Node version, backend type, and
 sanitized expected/actual output. For vulnerabilities, follow
-[SECURITY.md](SECURITY.md). Be respectful and constructive in discussions.
+[SECURITY.md](SECURITY.md). Everyone taking part follows the
+[code of conduct](CODE_OF_CONDUCT.md).
+
+Looking for somewhere to start? Issues labelled `good first issue` are small
+and self-contained. Comment on an issue before starting so two people do not
+do the same work.
 
 Contributions are made under the repository's Apache-2.0 license. Submit only
 work you have the right to contribute.
