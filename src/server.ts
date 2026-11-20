@@ -9,6 +9,7 @@ import {
   registerAppTool,
 } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
+import { isMain } from "./main.js";
 import { adapterFromEnv, type Adapter } from "./adapters/index.js";
 import {
   MAX_WINDOW_MINUTES,
@@ -65,8 +66,11 @@ function last(samples: (number | null)[]): number | null {
   return null;
 }
 
+/** Kept equal to the version in package.json; a test checks it. */
+export const VERSION = "0.2.0";
+
 export function createServer(adapter: Adapter, slo: Slo = sloFromEnv()): McpServer {
-  const server = new McpServer({ name: "observability-replay", version: "0.1.0" });
+  const server = new McpServer({ name: "observability-replay", version: VERSION });
 
   server.registerTool(
     "describe_backend",
@@ -293,10 +297,11 @@ export function createServer(adapter: Adapter, slo: Slo = sloFromEnv()): McpServ
   return server;
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
-if (isMain) {
+export async function main(): Promise<void> {
   const adapter = adapterFromEnv();
   await createServer(adapter).connect(new StdioServerTransport());
   // stdout carries the protocol, so anything for a human goes to stderr.
   console.error(`observability-replay ready (backend: ${adapter.name})`);
 }
+
+if (isMain(import.meta.url, "server")) await main();

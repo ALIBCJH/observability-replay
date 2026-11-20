@@ -1,8 +1,8 @@
 {
   "name": "observability-replay",
-  "version": "0.1.0",
-  "description": "Animated incident replay over any observability backend, as an MCP server",
-  "main": "dist/server.js",
+  "version": "0.2.0",
+  "description": "Application scorecards, an animated incident replay and a fixed health benchmark over any observability backend, as a read-only MCP server",
+  "main": "dist/lib.js",
   "scripts": {
     "test": "npm run build && tsx --test test/*.test.ts",
     "build": "node scripts/build.mjs",
@@ -25,13 +25,14 @@
   },
   "type": "module",
   "bin": {
-    "observability-replay": "dist/server.js"
+    "observability-replay": "dist/cli.js"
   },
   "engines": {
     "node": ">=20"
   },
   "license": "Apache-2.0",
   "files": [
+    "dist/cli.js",
     "dist/server.js",
     "dist/lib.js",
     "dist/bench.js",
@@ -48,5 +49,16 @@
   "bugs": {
     "url": "https://github.com/ALIBCJH/observability-replay/issues"
   },
-  "homepage": "https://github.com/ALIBCJH/observability-replay#readme"
+  "homepage": "https://github.com/ALIBCJH/observability-replay#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "observability",
+    "prometheus",
+    "kubernetes",
+    "sre",
+    "incident",
+    "benchmark",
+    "opentelemetry"
+  ]
 }
