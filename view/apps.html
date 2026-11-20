@@ -7,7 +7,7 @@
 <style>/*CSS*/</style>
 </head>
 <body>
-<div id="app">
+<div id="app" class="wide">
   <div id="nav" class="bar" hidden>
     <span class="brand">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="var(--accent)"/><path d="M4 13h4l2.5-6 3.5 10 2.5-6H20" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -29,13 +29,7 @@
 
   <p id="summary" class="muted" hidden></p>
 
-  <section id="fleet" class="surface" aria-label="All applications" hidden>
-    <div class="row head-row" aria-hidden="true">
-      <span>Application</span>
-      <span>Requests</span>
-      <span>p95 latency</span>
-      <span>Errors</span>
-    </div>
+  <section id="fleet" aria-label="All applications" hidden>
     <div id="rows"></div>
   </section>
 

@@ -3,7 +3,7 @@ import { playEntrance } from "./motion.js";
 import type { AppCard, ScorecardBundle, Severity, Status } from "../src/scorecard.js";
 
 /**
- * The scorecard page: every application in one list, worst first, and a detail
+ * The scorecard page: one card per application, worst first, and a detail
  * section for the selected one. It prints only values from the bundle.
  */
 
@@ -104,10 +104,42 @@ function renderSummary() {
   $("summary").replaceChildren(h("span", { class: `tag ${crit ? "crit" : warn ? "warn" : "ok"}` }, text), "Select an application for its charts.");
 }
 
-// ---------- fleet list ----------
+// ---------- application cards ----------
 
-function cell(label: string, value: string, level: "" | "bad" | "elevated"): HTMLElement {
-  return h("span", level ? { class: level } : {}, h("span", { class: "cell-label" }, label), value);
+const MARKS = {
+  yes: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  no: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  unknown: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+};
+
+/**
+ * Optimal means nothing at all to act on: within its objectives and using
+ * what it asks for. A healthy application that requests ten times the CPU it
+ * uses is not optimal.
+ */
+function optimal(a: AppCard): { answer: "yes" | "no" | "unknown"; word: string; why: string } {
+  if (a.status === "nodata") return { answer: "unknown", word: "Unknown", why: "No data in this window." };
+  const first = a.findings[0];
+  if (first) return { answer: "no", word: "No", why: first.text };
+  return { answer: "yes", word: "Yes", why: a.resources ? "Within its objectives and using what it requests." : "Within its objectives." };
+}
+
+function stat(label: string, value: string, note: string, level: "" | "bad" | "elevated" = ""): HTMLElement {
+  return h("div", { class: `stat${level ? ` ${level}` : ""}` }, h("span", { class: "k" }, label), h("span", { class: "v" }, value), note ? h("span", { class: "n" }, note) : null);
+}
+
+/** A share of something (a request, a limit) as a figure and a bar. */
+function share(label: string, v: number | null, of: string, warnAt: number): HTMLElement {
+  const level = v !== null && v >= warnAt ? "elevated" : "";
+  const bar = h("b");
+  bar.style.width = `${Math.round(Math.min(1, Math.max(0, v ?? 0)) * 100)}%`;
+  return h(
+    "div",
+    { class: `stat share${level ? ` ${level}` : ""}` },
+    h("span", { class: "k" }, label),
+    h("span", { class: "v" }, fmt.percent(v), v === null ? null : h("small", {}, ` ${of}`)),
+    v === null ? null : h("i", { "aria-hidden": "true" }, bar),
+  );
 }
 
 function renderRows() {
@@ -116,23 +148,52 @@ function renderRows() {
   $("rows").replaceChildren(
     ...b.apps.map((a) => {
       const p = a.performance;
+      const r = a.resources;
       const burn = p.burnRate ?? 0;
-      const row = h(
+      const where = [a.kind, a.cloud, a.cluster].filter(Boolean).join(" · ");
+      const o = optimal(a);
+      const mark = h("span", { class: "mark" });
+      mark.innerHTML = MARKS[o.answer];
+      const card = h(
         "button",
-        { class: "row", type: "button", "aria-pressed": String(a.id === selected), "data-app": a.id, "data-status": a.status },
+        { class: "row card", type: "button", "aria-pressed": String(a.id === selected), "data-app": a.id, "data-status": a.status },
         h(
           "span",
-          {},
-          h("span", { class: "name" }, a.id, a.status === "ok" ? null : h("span", { class: `tag ${a.status}` }, STATUS_WORD[a.status])),
-          a.findings[0] && a.status !== "ok" ? h("span", { class: "top-finding" }, a.findings[0].text) : null,
+          { class: "card-head" },
+          h("span", { class: "name" }, a.id),
+          h("span", { class: `tag ${a.status}` }, STATUS_WORD[a.status]),
+          where ? h("span", { class: "where" }, where) : null,
         ),
-        cell("Requests", fmt.rate(a.usage.now), ""),
-        cell("p95 latency", fmt.latency(p.p95Now), p.p95Now !== null && p.p95Now > b.slo.latencyP95 ? "bad" : ""),
-        cell("Errors", fmt.ratio(p.errorRatio), p.errorRatio !== null && p.errorRatio > budget ? (burn >= 14.4 ? "bad" : "elevated") : ""),
+        h(
+          "span",
+          { class: "card-body" },
+          h(
+            "span",
+            { class: "pane" },
+            h("span", { class: "pane-title" }, "Performance"),
+            stat("p95 latency", fmt.latency(p.p95Now), `objective ${fmt.latency(b.slo.latencyP95)}`, p.p95Now !== null && p.p95Now > b.slo.latencyP95 ? "bad" : ""),
+            stat("Errors", fmt.ratio(p.errorRatio), `budget ${fmt.ratio(budget)}`, p.errorRatio !== null && p.errorRatio > budget ? (burn >= 14.4 ? "bad" : "elevated") : ""),
+          ),
+          h(
+            "span",
+            { class: "pane" },
+            h("span", { class: "pane-title" }, "Metrics"),
+            stat("Requests", fmt.rate(a.usage.now), ""),
+            ...(r
+              ? [share("CPU", r.cpuOfRequest, "of request", 0.9), share("Memory, peak", r.memPeakOfLimit, "of limit", 0.9)]
+              : [stat("CPU and memory", "Not available", "")]),
+          ),
+        ),
+        h(
+          "span",
+          { class: `card-foot ${o.answer}` },
+          h("span", { class: "why" }, h("span", { class: "pane-title" }, "Optimal"), h("span", { class: "reason" }, o.why)),
+          h("span", { class: "answer" }, mark, o.word),
+        ),
       );
       // Choosing the open application again closes it.
-      row.addEventListener("click", () => select(a.id === selected ? null : a.id, true));
-      return row;
+      card.addEventListener("click", () => select(a.id === selected ? null : a.id, true));
+      return card;
     }),
   );
 }
