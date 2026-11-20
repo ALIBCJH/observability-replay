@@ -1,0 +1,22 @@
+node_modules/
+dist/
+results/
+coverage/
+*.tsbuildinfo
+*.tgz
+*.log
+
+# Local credentials and developer configuration
+.env
+.env.*
+!.env.example
+.aws/
+.codex/
+.agents/
+*.pem
+*.key
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+benchmark/plans/*.local.json
+.DS_Store

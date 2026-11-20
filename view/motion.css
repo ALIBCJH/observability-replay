@@ -1,0 +1,100 @@
+/* Motion, shared by every view. One small vocabulary of animations, used the
+   same way everywhere:
+
+     rise        a block fades in while rising 14px
+     grow        the gradient rule under a title draws itself
+     stampDrop   the grade lands like a stamp: large, tilted, then set
+     spanGrow    a bar draws from its left edge, one after another (trace spans)
+     termLine    a line arrives the way a terminal line does
+     arrowIn     an arrow slides in from the left
+     pop2        a small mark pops into place
+     livePulse   a ring spreads from a dot that needs attention (the LIVE dot)
+     fadeIn      a plain fade, as between slides (0.35s)
+
+   Every keyframe names only its starting state, and every use fills "both",
+   so with animation switched off the page is simply in its final state.
+   Entrances run once, while <html> has the class "enter" (see motion.ts);
+   redrawing a list later does not replay them. */
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes grow { from { width: 0; } }
+@keyframes stampDrop { from { opacity: 0; transform: rotate(-12deg) scale(2.4); } }
+@keyframes spanGrow { from { transform: scaleX(0); } }
+@keyframes termLine { from { opacity: 0; transform: translateY(4px); } }
+@keyframes arrowIn { from { opacity: 0; transform: translateX(-20px); } }
+@keyframes pop2 { from { opacity: 0; transform: scale(0.4); } }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--crit) 60%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--crit) 0%, transparent); }
+}
+
+/* --i is an element's place among its siblings, for staggering. */
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(1) { --i: 0; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(2) { --i: 1; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(3) { --i: 2; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(4) { --i: 3; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(5) { --i: 4; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(6) { --i: 5; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(7) { --i: 6; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(8) { --i: 7; }
+:is(#report, .tiles, .areas, .fixes, .phases, .results, .changes, .grid tbody, #rows, #onsets, #querylist, .charts, #stats) > :nth-child(n + 9) { --i: 8; }
+
+/* ---- every page ---- */
+
+/* The title rule draws itself under the title. */
+.head h1::after, .top h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--violet), var(--ok));
+}
+.enter .head h1::after, .enter .top h1::after { animation: grow 1s ease-out 0.4s both; }
+
+.enter .bar, .enter .head, .enter .top { animation: fadeIn 0.35s ease both; }
+.tabs a { transition: color 0.35s ease, background-color 0.35s ease; }
+
+/* Something critical keeps a quiet pulse. */
+.tag.crit::before { animation: livePulse 1.4s ease-out infinite; }
+
+/* A section that is opened: its lines arrive like terminal output. */
+details[open] > :not(summary) { animation: termLine 0.25s ease-out both; }
+details[open] #querylist > * { animation: termLine 0.25s ease-out both; animation-delay: calc(var(--i, 0) * 0.06s); }
+
+/* ---- benchmark report ---- */
+.enter #report > * { animation: rise 0.6s ease-out both; animation-delay: calc(var(--i, 0) * 0.1s); }
+.enter .grade { animation: stampDrop 0.4s cubic-bezier(0.2, 1, 0.3, 1) 0.5s both; }
+.enter .tiles > .tile { animation: rise 0.4s ease both; animation-delay: calc(0.7s + var(--i, 0) * 0.08s); }
+.track i, .phase { transform-origin: left center; }
+.enter .track i { animation: spanGrow 0.7s ease-out both; animation-delay: calc(0.5s + var(--i, 0) * 0.12s); }
+/* The test's phases draw in the order they happened, one after another. */
+.enter .phase { animation: spanGrow 0.7s ease-out both; animation-delay: calc(0.5s + var(--i, 0) * 0.45s); }
+.enter .results > .result { animation: rise 0.6s ease-out both; animation-delay: calc(1s + var(--i, 0) * 0.15s); }
+.enter .fixes > li { animation: rise 0.4s ease both; animation-delay: calc(0.6s + var(--i, 0) * 0.12s); }
+.enter .changes > li { animation: rise 0.4s ease both; animation-delay: calc(0.6s + var(--i, 0) * 0.12s); }
+.enter .changes .arrow { animation: arrowIn 0.6s ease-out both; animation-delay: calc(0.9s + var(--i, 0) * 0.12s); }
+.enter .grid .mark { animation: pop2 0.3s ease-out both; animation-delay: calc(0.8s + var(--i, 0) * 0.07s); }
+.fixes .mark.fail { animation: livePulse 1.4s ease-out infinite; }
+
+/* ---- applications ---- */
+.enter #summary, .enter #fleet { animation: rise 0.6s ease-out both; }
+.enter #rows > .row { animation: termLine 0.25s ease-out both; animation-delay: calc(0.3s + var(--i, 0) * 0.07s); }
+button.row { transition: background-color 0.2s ease; }
+/* Choosing an application: its sections rise in, as fragments do on Next. */
+#detail > * { animation: rise 0.4s ease both; }
+
+/* ---- incident replay ---- */
+.enter #stage { animation: rise 0.6s ease-out both; }
+.enter #panel { animation: rise 0.6s ease-out 0.1s both; }
+.enter #controls { animation: rise 0.6s ease-out 0.2s both; }
+/* Each new line of the story arrives like a line in a terminal. */
+#story li { animation: termLine 0.25s ease-out both; }
+#onsets > li { animation: termLine 0.25s ease-out both; animation-delay: calc(var(--i, 0) * 0.06s); }
+
+/* No motion for people who ask for none, and none on paper. */
+@media (prefers-reduced-motion: reduce), print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

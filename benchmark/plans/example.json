@@ -1,0 +1,12 @@
+{
+  "name": "example",
+  "load": {
+    "url": "http://127.0.0.1:8080/",
+    "ratePerSecond": 2
+  },
+  "fault": {
+    "description": "test application scaled to zero replicas",
+    "inject": "kubectl --context \"${BENCH_CONTEXT:?Set BENCH_CONTEXT to a disposable test cluster}\" -n \"${BENCH_NAMESPACE:?Set BENCH_NAMESPACE}\" scale deployment/\"${BENCH_DEPLOYMENT:?Set BENCH_DEPLOYMENT}\" --replicas=0",
+    "restore": "kubectl --context \"${BENCH_CONTEXT:?Set BENCH_CONTEXT}\" -n \"${BENCH_NAMESPACE:?Set BENCH_NAMESPACE}\" scale deployment/\"${BENCH_DEPLOYMENT:?Set BENCH_DEPLOYMENT}\" --replicas=\"${BENCH_REPLICAS:?Set BENCH_REPLICAS to the original replica count}\""
+  }
+}
