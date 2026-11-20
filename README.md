@@ -20,9 +20,13 @@ Needs Node 20 or newer (`nvm use` picks 22).
 ```bash
 npm ci
 npm run build
-xdg-open dist/apps-preview.html   # scorecards
-xdg-open dist/preview.html        # incident replay
+xdg-open dist/apps-preview.html        # scorecards
+xdg-open dist/preview.html             # incident replay
+xdg-open dist/benchmark-preview.html   # benchmark report
 ```
+
+On macOS use `open` instead of `xdg-open`; on Windows, open the files from
+the file explorer.
 
 The preview plays a scripted incident: a bad `payments` deploy on GCP slows
 payments, makes `checkout` on AWS time out, and reaches the gateway, until a
