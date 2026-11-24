@@ -141,6 +141,8 @@ test("a workload with no request data still gets a card, scored on resources", a
     alerts: (r: typeof range) => demo.alerts(r),
     changes: (r: typeof range) => demo.changes(r),
     resources: (r: typeof range) => demo.resources(r),
+    latency: (r: typeof range) => demo.latency(r),
+    endpoints: (r: typeof range) => demo.endpoints(r),
     serviceGraph: async (r: typeof range) => ({
       data: { range: r, services: [], serviceSeries: [], edgeSeries: [] },
       queries: [],

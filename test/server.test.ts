@@ -26,7 +26,7 @@ const textOf = (result: unknown) =>
     .map((c) => c.text ?? "")
     .join("\n");
 
-test("lists seven read-only tools, with each view tool linked to its page", async () => {
+test("lists eight read-only tools, with each view tool linked to its page", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name).sort(),
@@ -37,6 +37,7 @@ test("lists seven read-only tools, with each view tool linked to its page", asyn
       "get_service_graph",
       "incident_replay",
       "list_alerts",
+      "performance_analytics",
       "recent_changes",
     ],
   );
@@ -125,4 +126,21 @@ test("a bad end time is refused with a clear message", async () => {
     .catch((e: Error) => ({ isError: true, content: [{ type: "text", text: e.message }] }));
   assert.equal(result.isError, true);
   assert.match(textOf(result), /not a valid ISO 8601 time/);
+});
+
+test("performance_analytics returns the period against the one before, as text and for the view", async () => {
+  const result = await client.callTool({ name: "performance_analytics", arguments: { range: "1h", service: "payments" } });
+  assert.notEqual(result.isError, true);
+  const text = textOf(result);
+  assert.match(text, /SIMULATED demo data/);
+  assert.match(text, /- payments \[gcp\]: [\d,]+ requests/);
+  assert.match(text, /payments POST \/payments/);
+  assert.doesNotMatch(text, /- cart/);
+  const bundle = result.structuredContent as { kind: string; rangeKey: string; focus?: string };
+  assert.equal(bundle.kind, "performance");
+  assert.equal(bundle.rangeKey, "1h");
+  assert.equal(bundle.focus, "payments");
+
+  const bad = await client.callTool({ name: "performance_analytics", arguments: { range: "90d" } });
+  assert.equal(bad.isError, true);
 });

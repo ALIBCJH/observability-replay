@@ -40,6 +40,7 @@
     "dist/replay.html",
     "dist/apps.html",
     "dist/benchmark.html",
+    "dist/performance.html",
     "THIRD_PARTY_NOTICES.txt"
   ],
   "repository": {

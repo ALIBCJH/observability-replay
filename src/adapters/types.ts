@@ -1,6 +1,8 @@
 import type {
   AlertEvent,
   ChangeEvent,
+  EndpointSeries,
+  LatencySeries,
   ResourceSeries,
   ServiceGraphSeries,
   SourceQuery,
@@ -14,6 +16,10 @@ export interface Capabilities {
   changes: boolean;
   /** CPU, memory, restarts and replicas per workload. */
   resources: boolean;
+  /** Mean, p50, p90 and p99 latency per service. */
+  latencyDetail: boolean;
+  /** Per-route request, 4xx, 5xx and latency series. */
+  endpoints: boolean;
 }
 
 export interface Sourced<T> {
@@ -33,4 +39,6 @@ export interface Adapter {
   alerts(range: TimeRange): Promise<Sourced<AlertEvent[]>>;
   changes(range: TimeRange): Promise<Sourced<ChangeEvent[]>>;
   resources(range: TimeRange): Promise<Sourced<ResourceSeries[]>>;
+  latency(range: TimeRange): Promise<Sourced<LatencySeries[]>>;
+  endpoints(range: TimeRange): Promise<Sourced<EndpointSeries[]>>;
 }

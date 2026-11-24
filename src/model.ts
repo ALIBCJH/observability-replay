@@ -86,6 +86,34 @@ export interface ResourceSeries {
   replicas: Samples;
 }
 
+/**
+ * The rest of a service's latency distribution, beside the p95 that
+ * ServiceSeries carries. All in seconds.
+ */
+export interface LatencySeries {
+  service: string;
+  /** Total time over total requests in each step. */
+  mean: Samples;
+  p50: Samples;
+  p90: Samples;
+  p99: Samples;
+}
+
+/**
+ * One route of one service, from its HTTP server metrics. Rates are requests
+ * per second; `rate4xx` and `rate5xx` are the parts of `rate` answered with
+ * those status classes.
+ */
+export interface EndpointSeries {
+  service: string;
+  /** Method and route as the backend labels them, e.g. "POST /orders". */
+  endpoint: string;
+  rate: Samples;
+  rate4xx: Samples;
+  rate5xx: Samples;
+  latencyP95: Samples;
+}
+
 /** A deploy, rollback, config change: anything that changed the system. */
 export interface ChangeEvent {
   at: Ts;

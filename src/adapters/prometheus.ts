@@ -3,6 +3,8 @@ import {
   type AlertEvent,
   type ResourceSeries,
   type ChangeEvent,
+  type EndpointSeries,
+  type LatencySeries,
   type Samples,
   type ServiceGraphSeries,
   type ServiceRef,
@@ -44,8 +46,28 @@ export interface PrometheusOptions {
    * cluster's system pods.
    */
   workloadMatchers?: string;
+  /** Set false if no HTTP server metrics with a route label are scraped. */
+  endpoints?: boolean;
+  /**
+   * HTTP server duration histogram, without `_bucket`. Default is the
+   * OpenTelemetry name, `http_server_request_duration_seconds`.
+   */
+  httpHistogram?: string;
+  /** Label holding the service id used in the service graph. Default `service_name`. */
+  httpServiceLabel?: string;
+  /** Default `http_route`. */
+  httpRouteLabel?: string;
+  /** Default `http_request_method`; set to an empty string if there is none. */
+  httpMethodLabel?: string;
+  /** Default `http_response_status_code`. */
+  httpStatusLabel?: string;
+  /** Extra label matchers added to every HTTP metric query, e.g. `namespace="shop"`. */
+  httpMatchers?: string;
   fetchImpl?: typeof fetch;
 }
+
+/** Routes kept per read, busiest first, so one service cannot flood the page. */
+export const MAX_ENDPOINTS = 60;
 
 interface PromSeries {
   metric: Record<string, string>;
@@ -73,6 +95,8 @@ export class PrometheusAdapter implements Adapter {
       alerts: true,
       changes: opts.changes !== false,
       resources: opts.resources !== false,
+      latencyDetail: true,
+      endpoints: opts.endpoints !== false,
     };
   }
 
@@ -195,6 +219,93 @@ export class PrometheusAdapter implements Adapter {
     });
 
     return { data: { range, services, serviceSeries, edgeSeries }, queries };
+  }
+
+  async latency(range: TimeRange): Promise<Sourced<LatencySeries[]>> {
+    const w = `${Math.max(2 * range.step, 60)}s`;
+    const m = this.opts.matchers ? `,${this.opts.matchers}` : "";
+    const h = this.histogram;
+    // The same choice of timing as the p95 in serviceGraph: the server's own
+    // where the server sends spans, the caller's where only the caller does.
+    const real = (suffix: string) =>
+      `rate(${h}_${suffix}{connection_type=""${m}}[${w}]) or rate(${h}_${suffix}{client="user"${m}}[${w}])`;
+    const quantile = (q: number) => `histogram_quantile(${q}, sum by (server, le) (${real("bucket")}))`;
+    const specs: [keyof Omit<LatencySeries, "service">, string, string][] = [
+      ["mean", "Mean latency per service", `sum by (server) (${real("sum")}) / sum by (server) (${real("count")})`],
+      ["p50", "p50 latency per service", quantile(0.5)],
+      ["p90", "p90 latency per service", quantile(0.9)],
+      ["p99", "p99 latency per service", quantile(0.99)],
+    ];
+    const results = await Promise.all(specs.map(([, , q]) => this.rangeQuery(q, range)));
+    const n = stepsIn(range);
+    const by = new Map<string, LatencySeries>();
+    const blank = (): Samples => new Array(n).fill(null);
+    results.forEach((result, i) => {
+      for (const s of result) {
+        const id = s.metric.server;
+        if (!id) continue;
+        if (!by.has(id)) by.set(id, { service: id, mean: blank(), p50: blank(), p90: blank(), p99: blank() });
+        by.get(id)![specs[i]![0]] = this.align(s, range);
+      }
+    });
+    return {
+      data: [...by.values()].sort((a, b) => a.service.localeCompare(b.service)),
+      queries: specs.map(([, purpose, query]) => ({ purpose, language: "PromQL", query })),
+    };
+  }
+
+  async endpoints(range: TimeRange): Promise<Sourced<EndpointSeries[]>> {
+    if (!this.capabilities.endpoints) return { data: [], queries: [] };
+    const o = this.opts;
+    const h = o.httpHistogram ?? "http_server_request_duration_seconds";
+    const svc = o.httpServiceLabel ?? "service_name";
+    const route = o.httpRouteLabel ?? "http_route";
+    const method = o.httpMethodLabel ?? "http_request_method";
+    const status = o.httpStatusLabel ?? "http_response_status_code";
+    const w = `${Math.max(2 * range.step, 60)}s`;
+    const by = [svc, method, route].filter(Boolean).join(", ");
+    const sel = (extra = "") => {
+      const parts = [extra, o.httpMatchers ?? ""].filter(Boolean).join(",");
+      return parts ? `{${parts}}` : "";
+    };
+    const count = (extra = "") => `sum by (${by}) (rate(${h}_count${sel(extra)}[${w}]))`;
+    const specs: [keyof Omit<EndpointSeries, "service" | "endpoint">, string, string][] = [
+      ["rate", "Request rate per route", count()],
+      ["rate4xx", "Rate of 4xx responses per route", count(`${status}=~"4.."`)],
+      ["rate5xx", "Rate of 5xx responses per route", count(`${status}=~"5.."`)],
+      ["latencyP95", "p95 latency per route", `histogram_quantile(0.95, sum by (${by}, le) (rate(${h}_bucket${sel()}[${w}])))`],
+    ];
+    const results = await Promise.all(specs.map(([, , q]) => this.rangeQuery(q, range)));
+    const n = stepsIn(range);
+    const found = new Map<string, EndpointSeries>();
+    results.forEach((result, i) => {
+      const field = specs[i]![0];
+      for (const s of result) {
+        const service = s.metric[svc];
+        const path = s.metric[route];
+        // A request that matched no route has no route label; it is not an endpoint.
+        if (!service || !path) continue;
+        const endpoint = method && s.metric[method] ? `${s.metric[method]} ${path}` : path;
+        const key = `${service}\u0000${endpoint}`;
+        if (!found.has(key)) {
+          // A route that never answered 4xx or 5xx has no such series: that is
+          // a zero wherever the route had traffic, filled in below.
+          found.set(key, { service, endpoint, rate: new Array(n).fill(null), rate4xx: [], rate5xx: [], latencyP95: new Array(n).fill(null) });
+        }
+        found.get(key)![field] = this.align(s, range);
+      }
+    });
+    const total = (e: EndpointSeries) => e.rate.reduce<number>((a, v) => a + (v ?? 0), 0);
+    const data = [...found.values()]
+      .map((e) => ({
+        ...e,
+        rate4xx: e.rate.map((r, i) => (r === null ? null : (e.rate4xx[i] ?? 0))),
+        rate5xx: e.rate.map((r, i) => (r === null ? null : (e.rate5xx[i] ?? 0))),
+      }))
+      .sort((a, b) => total(b) - total(a))
+      .slice(0, MAX_ENDPOINTS)
+      .sort((a, b) => a.service.localeCompare(b.service) || a.endpoint.localeCompare(b.endpoint));
+    return { data, queries: specs.map(([, purpose, query]) => ({ purpose, language: "PromQL", query })) };
   }
 
   async alerts(range: TimeRange): Promise<Sourced<AlertEvent[]>> {

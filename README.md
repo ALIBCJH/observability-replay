@@ -1,11 +1,14 @@
 # Observability replay
 
-An MCP server that gives an agent two views over any observability backend:
+An MCP server that gives an agent three views over any observability backend:
 
 - **Application scorecards:** how each application is doing, worst first, with
   the same measures on every cloud: request volume, p95 latency, error ratio
   against the error budget, CPU and memory used against what it requested,
   restarts, and whether its last deploy made things better or worse.
+- **Performance analytics:** traffic, latency (mean, p50, p90, p95, p99), failed
+  requests, 4xx and 5xx per route, CPU and memory, over the last 15 minutes to
+  30 days, each figure set beside the period just before it.
 - **Incident replay:** the service map animated over a time window, with traffic
   flowing between services, errors and latency spreading, and deploys and alerts
   marked on a timeline you can scrub.
@@ -22,7 +25,7 @@ npx observability-replay live
 ```
 
 Then open http://127.0.0.1:8766/. With no backend configured it plays a
-scripted incident, so you can see all three pages before connecting anything.
+scripted incident, so you can see every page before connecting anything.
 
 ## Try it from a checkout
 
@@ -32,6 +35,7 @@ Needs Node 20 or newer (`nvm use` picks 22).
 npm ci
 npm run build
 xdg-open dist/apps-preview.html        # scorecards
+xdg-open dist/performance-preview.html # performance analytics
 xdg-open dist/preview.html             # incident replay
 xdg-open dist/benchmark-preview.html   # benchmark report
 ```
@@ -74,6 +78,7 @@ tools still work and return text.
 | `get_service_graph` | Services, calls, and each one's latest rate, error ratio and p95 latency |
 | `list_alerts` | Alerts that fired in the window |
 | `recent_changes` | Deploys and rollbacks in the window |
+| `performance_analytics` | The performance page, plus each service's requests, latency, failures and resources against the previous period, and the slowest and most failing routes, as text |
 | `benchmark` | The benchmark report page, plus the grade and each check that needs a look as text |
 | `describe_backend` | Which backend is connected and what it can supply |
 
@@ -154,7 +159,7 @@ Docker container addresses.
 
 ## Watch a backend live
 
-`npx observability-replay live` (or `npm run live` in a checkout) serves the three pages on the connected backend's own data,
+`npx observability-replay live` (or `npm run live` in a checkout) serves the four pages on the connected backend's own data,
 on this machine only (`127.0.0.1`), so you can leave the applications page
 open while something happens: a deploy, a load test, a pod being killed.
 
@@ -169,6 +174,66 @@ every `--refresh` seconds (0 turns that off) and keeps the open application
 selected. `--minutes` is the window each page covers and `--port` changes the
 port. The pages are read-only and have no sign-in, which is why they are bound
 to the loopback address; do not put them behind a public proxy.
+
+## Performance analytics
+
+The Performance page (`/performance-preview.html` when served live,
+`dist/performance-preview.html` from a checkout, or the `performance_analytics`
+tool) answers the everyday questions: is the application receiving traffic,
+which routes are slow, are errors increasing, is it using more CPU or memory,
+and how does this compare with the period before.
+
+- **Periods:** 15 minutes, 1 hour, 6 hours, 24 hours, 7 days, 30 days, always
+  ending now. A longer period uses wider steps, so no read returns more than 96
+  samples per series. A period that reaches past the backend's retention shows
+  a gap, not a guess.
+- **Against before:** every headline figure sits beside the same figure for the
+  period of equal length just before. It shows that a figure moved; it does not
+  say why.
+- **Filters:** period, environment (cloud and cluster, where the backend labels
+  them) and service. Selecting a service opens its latency percentiles, its
+  routes, CPU and memory; selecting a route opens that route's requests, p95
+  and error responses.
+- **Figures:** requests are the rate samples multiplied by the step. Failed
+  requests are weighted by traffic. A percentile shown as one figure is the
+  median of the period's samples of that percentile, with the worst sample
+  beside it. "All services" counts a request once in each service it passes
+  through.
+- **Simulated data:** with the demo backend the page says so in a banner, and
+  the tool's text says so in its first line.
+- **Gaps:** anything that could not be read (the previous period, percentiles,
+  routes, resources) is listed under "Not available" with the backend's own
+  message; the rest of the page still loads.
+
+Served live, a period is read from the backend once and shared by every reader
+for up to half a step (at least the refresh interval, at most five minutes), so
+an open page cannot make the backend repeat the same queries.
+
+### Per-route metrics on Prometheus
+
+Percentiles and the mean come from the same service graph histogram as the
+p95. Routes and status codes are not in the service graph; they are read from
+the services' HTTP server metrics. The defaults are the OpenTelemetry names;
+map them if yours differ.
+
+| Variable | Meaning |
+| --- | --- |
+| `OBS_PROM_ENDPOINTS=off` | Skip the per-route queries |
+| `OBS_PROM_HTTP_HISTOGRAM` | HTTP server duration histogram without `_bucket`, default `http_server_request_duration_seconds` |
+| `OBS_PROM_HTTP_SERVICE_LABEL` | Label whose value equals the service name in the traces, default `service_name` |
+| `OBS_PROM_HTTP_ROUTE_LABEL` | Default `http_route` |
+| `OBS_PROM_HTTP_METHOD_LABEL` | Default `http_request_method`; set it empty if there is none |
+| `OBS_PROM_HTTP_STATUS_LABEL` | Default `http_response_status_code` |
+| `OBS_PROM_HTTP_MATCHERS` | Optional label matchers for every HTTP metric query, e.g. `namespace="shop"` |
+
+The 60 busiest routes are kept per read. A request that matched no route has
+no route label and is left out. The per-route and percentile queries are
+covered by the included tests against a mock server; they have not yet been
+run against a live Prometheus.
+
+Not in this version: disk and network use, a previous-period figure for each
+route, and a comparison against a chosen day rather than the period just
+before.
 
 ## What the scorecard measures
 
@@ -265,10 +330,11 @@ src/adapters/demo.ts    scripted incident
 src/adapters/prometheus.ts
 src/replay.ts           bounded time ranges, baseline/onset detection, the bundle, the text summary
 src/scorecard.ts        the scorecard definitions, findings and text summary
+src/performance.ts      the periods, the previous-period comparison, the bundle, the text summary
 src/benchmark.ts        the benchmark standard, its checks, scoring and comparison
 src/bench.ts            the benchmark command line: observe, and the active test
 src/server.ts           the MCP tools and the view resources
-view/                   the three pages, each bundled into one HTML file
+view/                   the four pages, each bundled into one HTML file
 ```
 
 Three rules the code holds to:
