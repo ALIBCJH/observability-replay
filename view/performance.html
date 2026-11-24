@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance analytics</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<div id="app" class="wide">
+  <div id="nav" class="bar" hidden>
+    <span class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="var(--accent)"/><path d="M4 13h4l2.5-6 3.5 10 2.5-6H20" fill="none" stroke="var(--surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Observability replay
+    </span>
+    <nav class="tabs" aria-label="Views">
+      <a href="apps-preview.html">Applications</a>
+      <a href="performance-preview.html" aria-current="page">Performance</a>
+      <a href="preview.html">Incident replay</a>
+      <a href="benchmark-preview.html">Benchmark</a>
+    </nav>
+  </div>
+
+  <header class="head">
+    <h1>Performance</h1>
+    <p id="meta" class="muted"></p>
+  </header>
+
+  <p id="simulated" class="banner" hidden>
+    <span class="tag info">Simulated data</span>
+    <span>These figures come from a scripted demo, not from a real system. Connect a backend to see your own.</span>
+  </p>
+
+  <div id="filters" class="filters" hidden>
+    <div id="ranges" class="seg" role="group" aria-label="Period"></div>
+    <label id="envwrap" hidden><span>Environment</span><select id="env"></select></label>
+    <label><span>Application</span><select id="service"></select></label>
+  </div>
+
+  <p id="state" class="surface notice muted" role="status" hidden></p>
+
+  <div id="body" hidden>
+    <div id="summary" class="summary"></div>
+    <div id="tiles" class="tiles" hidden></div>
+    <div id="charts" class="charts" hidden></div>
+
+    <section id="services" aria-label="Applications" hidden>
+      <div id="cards" class="apps"></div>
+    </section>
+
+    <section id="routes" class="surface block" aria-labelledby="routes-h">
+      <div class="block-head">
+        <h2 id="routes-h">Routes</h2>
+        <input id="routefilter" type="search" placeholder="Filter routes" aria-label="Filter routes">
+      </div>
+      <p id="routenote" class="muted"></p>
+      <div class="table-wrap"><table id="routetable"></table></div>
+      <div id="routedetail" hidden></div>
+    </section>
+
+    <ul id="gaps" class="gaps" hidden></ul>
+
+    <details id="queries">
+      <summary>Source queries</summary>
+      <dl id="querylist"></dl>
+    </details>
+  </div>
+</div>
+<script>window.__PERFORMANCE__ = /*DATA*/null;</script>
+<script>/*JS*/</script>
+</body>
+</html>

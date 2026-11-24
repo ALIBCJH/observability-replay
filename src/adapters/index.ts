@@ -32,6 +32,13 @@ export function adapterFromEnv(env: NodeJS.ProcessEnv = process.env): Adapter {
       resources: env.OBS_PROM_RESOURCES !== "off",
       workloadLabel: env.OBS_PROM_WORKLOAD_LABEL,
       workloadMatchers: env.OBS_PROM_WORKLOAD_MATCHERS,
+      endpoints: env.OBS_PROM_ENDPOINTS !== "off",
+      httpHistogram: env.OBS_PROM_HTTP_HISTOGRAM,
+      httpServiceLabel: env.OBS_PROM_HTTP_SERVICE_LABEL,
+      httpRouteLabel: env.OBS_PROM_HTTP_ROUTE_LABEL,
+      httpMethodLabel: env.OBS_PROM_HTTP_METHOD_LABEL,
+      httpStatusLabel: env.OBS_PROM_HTTP_STATUS_LABEL,
+      httpMatchers: env.OBS_PROM_HTTP_MATCHERS,
     });
   }
   throw new Error(`Unknown OBS_BACKEND "${backend}" (expected demo or prometheus)`);

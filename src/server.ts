@@ -21,6 +21,7 @@ import {
   summarize,
 } from "./replay.js";
 import { runBenchmark, summarizeBenchmark } from "./benchmark.js";
+import { PERFORMANCE_RANGES, buildPerformance, summarizePerformance } from "./performance.js";
 import {
   SCORECARD_MAX_FRAMES,
   buildScorecards,
@@ -35,6 +36,9 @@ const APPS_URI = "ui://observability/apps.html";
 const APPS_FILE = fileURLToPath(new URL("./apps.html", import.meta.url));
 const BENCH_URI = "ui://observability/benchmark.html";
 const BENCH_FILE = fileURLToPath(new URL("./benchmark.html", import.meta.url));
+
+const PERF_URI = "ui://observability/performance.html";
+const PERF_FILE = fileURLToPath(new URL("./performance.html", import.meta.url));
 
 const windowShape = {
   minutes: z
@@ -278,6 +282,41 @@ export function createServer(adapter: Adapter, slo: Slo = sloFromEnv()): McpServ
     async () => ({
       contents: [
         { uri: BENCH_URI, mimeType: RESOURCE_MIME_TYPE, text: await readFile(BENCH_FILE, "utf-8") },
+      ],
+    }),
+  );
+
+  registerAppTool(
+    server,
+    "performance_analytics",
+    {
+      title: "Performance analytics",
+      description:
+        "Traffic, latency, errors and resource use over a period, each set beside the period just before it: requests served, mean, p50, p90, p95 and p99 latency, failed requests, 4xx and 5xx per route, the slowest and most failing routes, CPU and memory. Use it for questions like: is the application receiving traffic, which endpoints are slow, are errors increasing, how does this compare with yesterday. Shows the analytics page and returns the same figures as text. A comparison shows that a figure moved, not why.",
+      inputSchema: {
+        range: z.enum(PERFORMANCE_RANGES).default("1h").describe("The period to analyse, ending now."),
+        service: z.string().optional().describe("Service id to open and to limit the text summary to."),
+      },
+      annotations: { readOnlyHint: true },
+      _meta: { ui: { resourceUri: PERF_URI } },
+    },
+    async ({ range, service }) => {
+      const bundle = await buildPerformance(adapter, range, service);
+      return {
+        content: [{ type: "text" as const, text: summarizePerformance(bundle, service) }],
+        structuredContent: bundle as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  registerAppResource(
+    server,
+    "Performance analytics view",
+    PERF_URI,
+    { description: "Traffic, latency, errors and resources per service and route, against the previous period." },
+    async () => ({
+      contents: [
+        { uri: PERF_URI, mimeType: RESOURCE_MIME_TYPE, text: await readFile(PERF_FILE, "utf-8") },
       ],
     }),
   );

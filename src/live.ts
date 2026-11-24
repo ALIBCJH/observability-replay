@@ -5,6 +5,7 @@ import { adapterFromEnv } from "./adapters/index.js";
 import type { Adapter } from "./adapters/types.js";
 import { runBenchmark } from "./benchmark.js";
 import { isMain } from "./main.js";
+import { buildPerformance, isRangeKey, performanceRange, type PerformanceBundle, type RangeKey } from "./performance.js";
 import { buildReplay, resolveRange } from "./replay.js";
 import { buildScorecards, SCORECARD_MAX_FRAMES, sloFromEnv } from "./scorecard.js";
 
@@ -24,6 +25,8 @@ export interface LiveOptions {
   viewDir?: URL;
 }
 
+class BadRequest extends Error {}
+
 const inline = (html: string, data: unknown, extra = "") =>
   html
     .replace("/*DATA*/null", () => JSON.stringify(data).replace(/</g, "\\u003c"))
@@ -34,7 +37,38 @@ export function liveServer(adapter: Adapter, opts: LiveOptions): Server {
   const cards = () =>
     buildScorecards(adapter, resolveRange(opts.minutes, undefined, undefined, SCORECARD_MAX_FRAMES), sloFromEnv());
 
-  const routes: Record<string, () => Promise<{ type: string; body: string }>> = {
+  // One read per period is shared by everyone who asks within a step of it,
+  // so an open page, or several, cannot make the backend run the same queries
+  // over and over. A failed read is not kept.
+  const held = new Map<RangeKey, { until: number; bundle: Promise<PerformanceBundle> }>();
+  const performance = (key: RangeKey) => {
+    const hit = held.get(key);
+    if (hit && hit.until > Date.now()) return hit.bundle;
+    const seconds = Math.min(300, Math.max(opts.refreshSeconds || 10, performanceRange(key).step / 2));
+    const bundle = buildPerformance(adapter, key);
+    held.set(key, { until: Date.now() + seconds * 1000, bundle });
+    bundle.catch(() => held.delete(key));
+    return bundle;
+  };
+  const rangeOf = (query: URLSearchParams): RangeKey => {
+    const asked = query.get("range") ?? "1h";
+    if (!isRangeKey(asked)) throw new BadRequest(`unknown range "${asked.slice(0, 20)}"`);
+    return asked;
+  };
+
+  const routes: Record<string, (query: URLSearchParams) => Promise<{ type: string; body: string }>> = {
+    "/performance-preview.html": async (query) => ({
+      type: "text/html",
+      body: inline(
+        await page("performance"),
+        await performance(rangeOf(query)),
+        `<script>window.__LIVE__=${JSON.stringify({ url: "performance.json", seconds: opts.refreshSeconds })};</script>`,
+      ),
+    }),
+    "/performance.json": async (query) => ({
+      type: "application/json",
+      body: JSON.stringify(await performance(rangeOf(query))),
+    }),
     "/apps-preview.html": async () => ({
       type: "text/html",
       body: inline(
@@ -60,7 +94,8 @@ export function liveServer(adapter: Adapter, opts: LiveOptions): Server {
   };
 
   return createServer((req, res) => {
-    const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const path = url.pathname;
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405).end();
       return;
@@ -74,9 +109,12 @@ export function liveServer(adapter: Adapter, opts: LiveOptions): Server {
       res.writeHead(404, { "content-type": "text/plain" }).end("not found");
       return;
     }
-    route().then(
+    route(url.searchParams).then(
       ({ type, body }) => res.writeHead(200, { "content-type": `${type}; charset=utf-8`, "cache-control": "no-store" }).end(body),
-      (e: Error) => res.writeHead(502, { "content-type": "text/plain; charset=utf-8" }).end(`backend error: ${e.message}`),
+      (e: Error) =>
+        e instanceof BadRequest
+          ? res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }).end(e.message)
+          : res.writeHead(502, { "content-type": "text/plain; charset=utf-8" }).end(`backend error: ${e.message}`),
     );
   });
 }

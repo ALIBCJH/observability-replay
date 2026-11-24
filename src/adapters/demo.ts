@@ -4,6 +4,8 @@ import {
   type AlertEvent,
   type ChangeEvent,
   type EdgeRef,
+  type EndpointSeries,
+  type LatencySeries,
   type ResourceSeries,
   type ServiceGraphSeries,
   type ServiceRef,
@@ -186,6 +188,37 @@ function resourcePoint(id: string, s: number, t: Ts): ResourcePoint {
   }
 }
 
+/**
+ * Scripted routes per service: the share of the service's requests each one
+ * takes, how its p95 compares with the service's, the share of the service's
+ * failures it carries, and a steady share of client errors (4xx).
+ */
+const ENDPOINTS: Record<string, { endpoint: string; share: number; slow: number; fails: number; clientErr: number }[]> = {
+  "web-gateway": [
+    { endpoint: "GET /", share: 0.4, slow: 0.5, fails: 0, clientErr: 0.002 },
+    { endpoint: "GET /cart", share: 0.25, slow: 0.6, fails: 0, clientErr: 0.004 },
+    { endpoint: "POST /checkout", share: 0.35, slow: 1, fails: 1, clientErr: 0.011 },
+  ],
+  checkout: [
+    { endpoint: "POST /checkout", share: 0.7, slow: 1, fails: 0.9, clientErr: 0.012 },
+    { endpoint: "GET /checkout/{id}", share: 0.3, slow: 0.4, fails: 0.1, clientErr: 0.03 },
+  ],
+  cart: [
+    { endpoint: "GET /cart/{id}", share: 0.6, slow: 0.8, fails: 0.5, clientErr: 0.021 },
+    { endpoint: "POST /cart/{id}/items", share: 0.3, slow: 1, fails: 0.5, clientErr: 0.008 },
+    { endpoint: "DELETE /cart/{id}/items/{item}", share: 0.1, slow: 0.9, fails: 0, clientErr: 0.005 },
+  ],
+  payments: [
+    { endpoint: "POST /payments", share: 0.8, slow: 1, fails: 0.95, clientErr: 0.006 },
+    { endpoint: "GET /payments/{id}", share: 0.2, slow: 0.3, fails: 0.05, clientErr: 0.015 },
+  ],
+  inventory: [
+    { endpoint: "GET /stock/{sku}", share: 0.75, slow: 0.9, fails: 0.6, clientErr: 0.018 },
+    { endpoint: "POST /stock/reserve", share: 0.25, slow: 1, fails: 0.4, clientErr: 0.004 },
+  ],
+  notifications: [{ endpoint: "POST /notify", share: 1, slow: 1, fails: 1, clientErr: 0.002 }],
+};
+
 function round(n: number, digits: number): number {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
@@ -193,7 +226,14 @@ function round(n: number, digits: number): number {
 
 export class DemoAdapter implements Adapter {
   readonly name = "demo";
-  readonly capabilities = { serviceGraph: true, alerts: true, changes: true, resources: true };
+  readonly capabilities = {
+    serviceGraph: true,
+    alerts: true,
+    changes: true,
+    resources: true,
+    latencyDetail: true,
+    endpoints: true,
+  };
 
   /** Wall-clock time at which the scripted incident begins. */
   constructor(private readonly t0: Ts) {}
@@ -265,6 +305,43 @@ export class DemoAdapter implements Adapter {
       };
     });
     return { data, queries: this.note("CPU, memory, restarts and replicas per workload") };
+  }
+
+  async latency(range: TimeRange): Promise<Sourced<LatencySeries[]>> {
+    const n = stepsIn(range);
+    const data = SERVICES.map((svc) => {
+      // The rest of the distribution keeps a fixed shape around the p95.
+      const p95 = Array.from({ length: n }, (_, i) => {
+        const t = tsAt(range, i);
+        return servicePoint(svc.id, t - this.t0, t).latencyP95;
+      });
+      const scaled = (f: number) => p95.map((v) => round(v * f, 4));
+      return { service: svc.id, mean: scaled(0.52), p50: scaled(0.44), p90: scaled(0.84), p99: scaled(1.55) };
+    });
+    return { data, queries: this.note("Mean, p50, p90 and p99 latency per service") };
+  }
+
+  async endpoints(range: TimeRange): Promise<Sourced<EndpointSeries[]>> {
+    const n = stepsIn(range);
+    const data: EndpointSeries[] = [];
+    for (const [service, routes] of Object.entries(ENDPOINTS)) {
+      const pts = Array.from({ length: n }, (_, i) => {
+        const t = tsAt(range, i);
+        return servicePoint(service, t - this.t0, t);
+      });
+      for (const r of routes) {
+        data.push({
+          service,
+          endpoint: r.endpoint,
+          rate: pts.map((p) => round(p.rate * r.share, 3)),
+          rate4xx: pts.map((p) => round(p.rate * r.share * r.clientErr, 4)),
+          // The route's part of the service's failed requests.
+          rate5xx: pts.map((p) => round(p.rate * p.errorRatio * r.fails, 4)),
+          latencyP95: pts.map((p) => round(p.latencyP95 * r.slow, 4)),
+        });
+      }
+    }
+    return { data, queries: this.note("Requests, 4xx, 5xx and p95 latency per route") };
   }
 
   async alerts(range: TimeRange): Promise<Sourced<AlertEvent[]>> {

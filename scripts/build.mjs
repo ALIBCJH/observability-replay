@@ -51,6 +51,7 @@ async function buildView(name, cssFiles) {
 const replayHtml = await buildView("replay", ["base.css", "replay.css", "motion.css"]);
 const appsHtml = await buildView("apps", ["base.css", "apps.css", "motion.css"]);
 const benchHtml = await buildView("benchmark", ["base.css", "benchmark.css", "motion.css"]);
+const perfHtml = await buildView("performance", ["base.css", "performance.css", "motion.css"]);
 
 // Previews: the same pages with the demo incident's data inlined. Both use
 // one scenario start, so the two pages tell the same story.
@@ -71,6 +72,15 @@ await writeFile(
 await writeFile(
   p("dist/benchmark-preview.html"),
   inline(benchHtml, { kind: "benchmark-report", result: await lib.runBenchmark(adapter, cardRange) }),
+);
+
+// The performance preview carries every period, so its range control works
+// from a file with no server behind it.
+const periods = {};
+for (const key of lib.PERFORMANCE_RANGES) periods[key] = await lib.buildPerformance(adapter, key, undefined, now);
+await writeFile(
+  p("dist/performance-preview.html"),
+  inline(perfHtml, periods["1h"]).replace("</head>", () => `<script>window.__PERIODS__=${JSON.stringify(periods).replace(/</g, "\\u003c")};</script></head>`),
 );
 
 console.log(
